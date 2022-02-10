@@ -11,7 +11,8 @@ const app=express();
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const findOrCreate = require('mongoose-findorcreate')
 
-mongoose.connect("mongodb://localhost:27017/userDB")
+// mongoose.connect("mongodb://localhost:27017/userDB")
+mongoose.connect("mongodb+srv://admin-harshit:Harshit123@cluster0.whetd.mongodb.net/userDB?retryWrites=true&w=majority")
 
 
 
