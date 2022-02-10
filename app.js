@@ -1,4 +1,5 @@
 //jshint esversion:6
+require('dotenv').config()
 const express=require("express")
 const bodyParser=require("body-parser")
 const ejs=require("ejs")
@@ -7,6 +8,8 @@ const session=require("express-session")
 const passport=require("passport")
 const passportLocalMongoose =require("passport-local-mongoose")
 const app=express();
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const findOrCreate = require('mongoose-findorcreate')
 
 mongoose.connect("mongodb://localhost:27017/userDB")
 
@@ -28,23 +31,51 @@ app.use(passport.session());
 
 const userSchema=new mongoose.Schema({
     email:String,
-    password:String
+    password:String,
+    googleId:String
 })
 
 userSchema.plugin(passportLocalMongoose)
+userSchema.plugin(findOrCreate);
+const User=new mongoose.model("user",userSchema)
 
-const user=new mongoose.model("user",userSchema)
-
-passport.use(user.createStrategy());
+passport.use(User.createStrategy());
 
 
 
 passport.serializeUser(function(user, done) {
     done(null, user);
   });
-  
-  passport.deserializeUser(function(user, done) {
-    done(null, user);
+  passport.deserializeUser(function(id, done) {
+    User.findById(id, function(err, user) {
+      done(err, user);
+    });
+  });
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:3000/auth/google/secrets",
+    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    console.log(profile);
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+
+      return cb(err, user);
+    });
+  }
+));
+
+
+app.get('/auth/google',
+  passport.authenticate('google', { scope: ["profile"] }));
+
+app.get('/auth/google/secrets', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect('/secrets');
   });
 
 
@@ -75,7 +106,7 @@ app.get("/register",function(req,res){
 app.post("/register",function(req,res){
    
 
-user.register({username: req.body.username},req.body.password, function(err,user){
+User.register({username: req.body.username},req.body.password, function(err,user){
     if(err){console.log(err);
     res.redirect("/register");}
     else{
@@ -91,7 +122,7 @@ app.get("/login",function(req,res){
 })
 app.post("/login",function(req,res){
     
- const newuser=new user({
+ const newuser=new User({
         email:req.body.username,
         password: req.body.password
     })
